@@ -119,7 +119,7 @@ function empate(n){ return n > 1 ? `<div class="nota">Empate entre ${n} alumnos.
 function tIngresos(d){
   if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
   const g = d.global;
-  return d.alumnos.map(a => persona(a, `<b class="acento">${a.ingresos}</b> ingresos al portal`, false)
+  return d.alumnos.map(a => persona(a, `<b class="acento">${a.ingresos}</b> ingresos al portal`, true)
     + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div></div>`).join("")
     + empate(d.alumnos.length)
     + `<div class="nota">Porcentajes calculados sobre los ingresos de cada alumno. En general: ${g.pctQR}% QR · ${g.pctCURP}% CURP (${g.total} ingresos en total).</div>`;
@@ -136,7 +136,7 @@ function tDia(d){
 }
 function tAsistencias(d){
   if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
-  return d.alumnos.map(a => persona(a, `<b class="acento">${d.asistencias}</b> asistencias`, false)).join("") + empate(d.alumnos.length);
+  return d.alumnos.map(a => persona(a, `<b class="acento">${d.asistencias}</b> asistencias`, true)).join("") + empate(d.alumnos.length);
 }
 function listaConFoto(d, unidad){
   if(!d.alumnos.length) return `<div class="nota">Aún no hay registros.</div>`;
