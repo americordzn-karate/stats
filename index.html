@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Estadísticas | Senshi-Kan</title>
+<style>
+  :root{
+    --fondo:#0d0d0f; --panel:#16161a; --borde:#26262c; --texto:#ececf0; --suave:#9a9aa6;
+    --acento:#c8102e; --acento2:#e8b04a;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--fondo); color:var(--texto); font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif; min-height:100vh; }
+  header{ padding:28px 20px 8px; max-width:1100px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+  h1{ font-size:1.5rem; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
+  h1 span{ color:var(--acento); }
+  .sub{ color:var(--suave); font-size:.85rem; margin-top:4px; }
+  button{ font:inherit; cursor:pointer; border:1px solid var(--borde); background:var(--panel); color:var(--texto); padding:9px 16px; border-radius:8px; }
+  button.primario{ background:var(--acento); border-color:var(--acento); font-weight:600; }
+  button:disabled{ opacity:.5; cursor:default; }
+  .oculto{ display:none !important; }
+
+  #acceso{ max-width:380px; margin:12vh auto 0; padding:28px; background:var(--panel); border:1px solid var(--borde); border-radius:14px; text-align:center; }
+  #acceso h2{ font-weight:600; letter-spacing:.1em; text-transform:uppercase; font-size:1rem; margin-bottom:6px; }
+  #acceso p{ color:var(--suave); font-size:.85rem; margin-bottom:18px; }
+  #acceso input{ width:100%; padding:12px; margin-bottom:12px; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; color:var(--texto); font-size:1rem; text-align:center; }
+  #acceso button{ width:100%; }
+  #msgAcceso{ color:#ff6b7d; font-size:.85rem; margin-top:12px; min-height:1.2em; }
+
+  main{ max-width:1100px; margin:0 auto; padding:16px 20px 60px; display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:16px; }
+  .tarjeta{ background:var(--panel); border:1px solid var(--borde); border-radius:14px; padding:20px; }
+  .tarjeta.ancha{ grid-column:1 / -1; }
+  .tarjeta h3{ font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--suave); font-weight:600; margin-bottom:14px; }
+  .grande{ font-size:2.1rem; font-weight:700; line-height:1.1; }
+  .acento{ color:var(--acento2); }
+  .nota{ color:var(--suave); font-size:.8rem; margin-top:8px; }
+  .persona{ display:flex; gap:14px; align-items:center; padding:10px 0; }
+  .persona + .persona{ border-top:1px solid var(--borde); }
+  .foto{ width:76px; height:76px; border-radius:50%; background:#222229; border:2px solid var(--acento); object-fit:cover; flex:none; display:flex; align-items:center; justify-content:center; color:var(--suave); font-weight:600; font-size:1.3rem; overflow:hidden; }
+  .foto.chica{ width:0; height:0; border:0; display:none; }
+  .persona .nombre{ font-weight:600; font-size:1.05rem; }
+  .persona .dato{ color:var(--suave); font-size:.9rem; margin-top:3px; }
+  .barra{ display:flex; gap:20px; margin-top:12px; flex-wrap:wrap; }
+  .barra div{ font-size:.9rem; color:var(--suave); }
+  .barra b{ display:block; color:var(--texto); font-size:1.3rem; }
+  table{ width:100%; border-collapse:collapse; font-size:.92rem; }
+  th{ text-align:left; color:var(--suave); font-weight:600; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; padding:8px 10px; border-bottom:1px solid var(--borde); }
+  td{ padding:11px 10px; border-bottom:1px solid var(--borde); vertical-align:top; }
+  td small{ display:block; color:var(--suave); font-size:.78rem; margin-top:2px; }
+  .tabla-scroll{ overflow-x:auto; }
+  .error{ color:#ff6b7d; font-size:.9rem; }
+  #estado{ text-align:center; color:var(--suave); padding:40px 20px; grid-column:1 / -1; }
+</style>
+</head>
+<body>
+
+<header id="encabezado" class="oculto">
+  <div>
+    <h1>Senshi<span>-</span>Kan · Estadísticas</h1>
+    <div class="sub" id="generado"></div>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <button id="btnActualizar">Actualizar</button>
+    <button id="btnSalir">Salir</button>
+  </div>
+</header>
+
+<section id="acceso">
+  <h2>Acceso de administrador</h2>
+  <p>Ingrese su token para ver las estadísticas.</p>
+  <input type="password" id="token" placeholder="Token" autocomplete="off">
+  <button class="primario" id="btnEntrar">Entrar</button>
+  <div id="msgAcceso"></div>
+</section>
+
+<main id="contenido" class="oculto"></main>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN: pegue aquí la URL de su Apps Script
+   (la misma que usa el portal de retos, termina en /exec)
+   ============================================================ */
+const API_URL = "https://script.google.com/macros/s/AKfycbwX5w8iiwkJVbGtpz-5f20U9jue2MC0vouE3blkHXo9CIMqg9bvCZrAYE8WKxH4gXGWzg/exec";
+
+/* ============================================================
+   TARJETAS. Para una estadística nueva, agregue un elemento aquí
+   con la misma clave que registró en STATS_REGISTRO_ del script.
+   ============================================================ */
+const TARJETAS = [
+  { clave:"ingresosPortal",       titulo:"Alumno con más ingresos al portal de retos", dibujar:tIngresos },
+  { clave:"horarioPortal",        titulo:"Horario con más ingresos al portal",         dibujar:tHorario },
+  { clave:"diaPortal",            titulo:"Día de la semana con más ingresos",          dibujar:tDia },
+  { clave:"asistencias",          titulo:"Alumno con más asistencias",                 dibujar:tAsistencias },
+  { clave:"destacados",           titulo:"Más exámenes destacados",                    dibujar:tDestacados },
+  { clave:"asistenciasPerfectas", titulo:"Más asistencias perfectas",                  dibujar:tPerfectas },
+  { clave:"pagos",                titulo:"Pagos por año (por alumno)",                 dibujar:tPagos, ancha:true }
+];
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dinero = n => "$" + Number(n).toLocaleString("es-MX", { minimumFractionDigits:2, maximumFractionDigits:2 });
+const veces = (n, uno, varios) => n + " " + (n === 1 ? uno : varios);
+function hora12(h){ const x = h % 12 || 12; return x + ":00 " + (h < 12 ? "am" : "pm"); }
+function rangoHora(h){ return hora12(h) + " – " + hora12((h + 1) % 24); }
+function iniciales(n){ return String(n).split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join("").toUpperCase(); }
+function unir(lista){ return lista.length < 2 ? (lista[0] || "") : lista.slice(0,-1).join(", ") + " y " + lista[lista.length-1]; }
+
+function persona(a, detalleHTML, conFoto){
+  const foto = conFoto
+    ? `<div class="foto" data-foto="${esc(a.id)}">${esc(iniciales(a.nombre))}</div>` : "";
+  return `<div class="persona">${foto}<div><div class="nombre">${esc(a.nombre)}</div>
+          <div class="dato">${detalleHTML}</div></div></div>`;
+}
+function empate(n){ return n > 1 ? `<div class="nota">Empate entre ${n} alumnos.</div>` : ""; }
+
+/* ---------- dibujo de cada tarjeta ---------- */
+function tIngresos(d){
+  if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
+  const g = d.global;
+  return d.alumnos.map(a => persona(a, `<b class="acento">${a.ingresos}</b> ingresos al portal`, false)
+    + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div></div>`).join("")
+    + empate(d.alumnos.length)
+    + `<div class="nota">Porcentajes calculados sobre los ingresos de cada alumno. En general: ${g.pctQR}% QR · ${g.pctCURP}% CURP (${g.total} ingresos en total).</div>`;
+}
+function tHorario(d){
+  if(!d.horas.length) return `<div class="nota">Sin registros.</div>`;
+  return `<div class="grande">${d.horas.map(rangoHora).join("<br>")}</div>
+          <div class="nota">${veces(d.ingresos, "ingreso", "ingresos")} ${d.horas.length > 1 ? "en cada uno de estos periodos" : "en ese periodo"}.</div>`;
+}
+function tDia(d){
+  if(!d.dias.length) return `<div class="nota">Sin registros.</div>`;
+  return `<div class="grande">${esc(unir(d.dias))}</div>
+          <div class="nota">${veces(d.ingresos, "ingreso", "ingresos")} ${d.dias.length > 1 ? "en cada uno" : "en total"}.</div>`;
+}
+function tAsistencias(d){
+  if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
+  return d.alumnos.map(a => persona(a, `<b class="acento">${d.asistencias}</b> asistencias`, false)).join("") + empate(d.alumnos.length);
+}
+function listaConFoto(d, unidad){
+  if(!d.alumnos.length) return `<div class="nota">Aún no hay registros.</div>`;
+  return d.alumnos.map(a => persona(a, `<b class="acento">${d.total}</b> ${unidad}`, true)).join("") + empate(d.alumnos.length);
+}
+function tDestacados(d){ return listaConFoto(d, d.total === 1 ? "examen destacado" : "exámenes destacados"); }
+function tPerfectas(d){  return listaConFoto(d, d.total === 1 ? "asistencia perfecta" : "asistencias perfectas"); }
+
+function tPagos(d){
+  if(!d.anios.length) return `<div class="nota">Sin pagos registrados.</div>`;
+  const nombres = l => l.map(a => esc(a.nombre)).join(", ");
+  const filas = d.anios.map(y => `<tr>
+      <td><b>${y.anio}</b><small>${y.alumnosConPago} alumnos con pago</small></td>
+      <td>${dinero(y.max.monto)}<small>${nombres(y.max.alumnos)}</small></td>
+      <td>${dinero(y.min.monto)}<small>${nombres(y.min.alumnos)}</small></td>
+      <td>${dinero(y.promedio)}</td>
+      <td>${esc(unir(y.mesTop.meses))}<small>${dinero(y.mesTop.monto)} recibidos</small></td></tr>`).join("");
+  return `<div class="tabla-scroll"><table>
+      <thead><tr><th>Año</th><th>Máx.</th><th>Mín.</th><th>Prom.</th><th>Mes con más ingresos</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+      <div class="nota">Se suman todos los conceptos por alumno en el año (1 de enero al 31 de diciembre). No se consideran pagos de $0 ni cancelados. El promedio es entre los alumnos que pagaron en ese año.</div>`;
+}
+
+/* ---------- comunicación con el servidor ---------- */
+async function pedir(token){
+  const r = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },   // evita la verificación previa CORS
+    body: JSON.stringify({ accion: "estadisticas", token })
+  });
+  return r.json();
+}
+
+async function cargarFotos(){
+  const cajas = document.querySelectorAll("[data-foto]");
+  const cache = {};
+  for(const caja of cajas){
+    const id = caja.dataset.foto;
+    try{
+      if(!(id in cache)){
+        const r = await fetch(API_URL + "?accion=fotoAlumno&id=" + encodeURIComponent(id));
+        cache[id] = await r.json();
+      }
+      if(cache[id].success && cache[id].foto){
+        const img = document.createElement("img");
+        img.className = "foto"; img.alt = "";
+        img.referrerPolicy = "no-referrer";
+        img.src = cache[id].foto;
+        img.onerror = () => img.replaceWith(caja);       // si no carga, se queda con las iniciales
+        caja.replaceWith(img);
+      }
+    }catch(e){ /* se conservan las iniciales */ }
+  }
+}
+
+function pintar(resp){
+  $("generado").textContent = "Actualizado: " + resp.generado;
+  $("contenido").innerHTML = TARJETAS.map(t => {
+    let cuerpo;
+    if(resp.errores && resp.errores[t.clave]) cuerpo = `<div class="error">No se pudo calcular: ${esc(resp.errores[t.clave])}</div>`;
+    else if(!resp.modulos[t.clave]) cuerpo = `<div class="nota">Sin datos.</div>`;
+    else cuerpo = t.dibujar(resp.modulos[t.clave]);
+    return `<section class="tarjeta${t.ancha ? " ancha" : ""}"><h3>${esc(t.titulo)}</h3>${cuerpo}</section>`;
+  }).join("");
+  cargarFotos();
+}
+
+async function cargar(token, desdeLogin){
+  $("btnEntrar").disabled = true; $("btnActualizar").disabled = true;
+  $("msgAcceso").textContent = "";
+  if(!desdeLogin){ $("contenido").innerHTML = `<div id="estado">Calculando estadísticas…</div>`; }
+  try{
+    if(API_URL.indexOf("PEGUE_AQUI") === 0) throw new Error("Falta configurar API_URL en la página.");
+    const resp = await pedir(token);
+    if(!resp.success){
+      if(resp.codigo === "NO_AUTORIZADO"){
+        sessionStorage.removeItem("statsToken");
+        mostrarLogin("Token no válido o acceso bloqueado temporalmente.");
+      } else {
+        if(desdeLogin) mostrarLogin("Error: " + (resp.error || "desconocido"));
+        else $("contenido").innerHTML = `<div id="estado" class="error">Error: ${esc(resp.error || "desconocido")}</div>`;
+      }
+      return;
+    }
+    sessionStorage.setItem("statsToken", token);
+    $("acceso").classList.add("oculto");
+    $("encabezado").classList.remove("oculto");
+    $("contenido").classList.remove("oculto");
+    pintar(resp);
+  }catch(e){
+    if(desdeLogin) mostrarLogin("No se pudo conectar: " + e.message);
+    else $("contenido").innerHTML = `<div id="estado" class="error">No se pudo conectar: ${esc(e.message)}</div>`;
+  }finally{
+    $("btnEntrar").disabled = false; $("btnActualizar").disabled = false;
+  }
+}
+
+function mostrarLogin(msg){
+  $("encabezado").classList.add("oculto");
+  $("contenido").classList.add("oculto");
+  $("acceso").classList.remove("oculto");
+  $("msgAcceso").textContent = msg || "";
+  $("token").value = "";
+}
+
+$("btnEntrar").onclick = () => { const t = $("token").value.trim(); if(t) cargar(t, true); };
+$("token").addEventListener("keydown", e => { if(e.key === "Enter") $("btnEntrar").click(); });
+$("btnActualizar").onclick = () => cargar(sessionStorage.getItem("statsToken") || "", false);
+$("btnSalir").onclick = () => { sessionStorage.removeItem("statsToken"); mostrarLogin(""); };
+
+(function iniciar(){
+  const t = sessionStorage.getItem("statsToken");
+  if(t) cargar(t, true);
+})();
+</script>
+</body>
+</html>
