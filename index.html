@@ -230,7 +230,16 @@ const C_ROJO = "#d4152f", C_AMARILLO = "#f5c518", C_VERDE = "#2fb457", C_AZUL = 
       C_CELESTE = "#5cd0f5", C_MORADO = "#a855f7", C_GRIS = "#6b6b78";
 const COLOR_METODO = { "Transferencia":C_AZUL, "Efectivo":C_VERDE, "Tarjeta":C_ROJO, "Portal":C_CELESTE, "Otro":C_GRIS };
 const COLOR_GASTO  = { "Comisiones Portal":C_CELESTE, "Inventario":C_AMARILLO, "Publicidad":C_ROJO, "Senpai":C_MORADO, "Otros":C_GRIS };
-const PALETA_CONCEPTOS = [C_ROJO, C_AMARILLO, C_VERDE, C_AZUL, C_CELESTE, C_MORADO];
+// Color fijo por categoría de pago (clave: nombre sin acentos, en minúsculas)
+const COLOR_CONCEPTO = {
+  "mensualidad":C_ROJO, "examen":C_AMARILLO, "inscripcion":C_VERDE, "uniforme":C_AZUL,
+  "equipo":C_CELESTE, "producto":C_MORADO,
+  "visita":"#fb923c",      // naranja
+  "merch":"#ec4899",       // rosa
+  "libro":"#b8e23a"        // lima
+};
+const COLOR_CONCEPTO_EXTRA = ["#14b8a6", "#f472b6", "#94a3b8", "#d97706"];   // categorías nuevas que aún no tienen color
+const sinAcentos = t => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
 const dineroCorto = n => "$" + Number(n).toLocaleString("es-MX", { maximumFractionDigits: 0 });
 
 // Gráfica circular por monto: items = [{nombre, monto, color}]
@@ -263,13 +272,21 @@ function donaGen(partes, total, etiqueta, centro){
     <div class="leyenda">${leyenda}</div></div>`;
 }
 
-// Hasta 6 categorías con color propio (de mayor a menor monto); el resto se agrupa en "Otros" (gris)
 function itemsConceptos(lista){
-  const orden = lista.slice().sort((a, b) => b.monto - a.monto);
-  const items = orden.slice(0, PALETA_CONCEPTOS.length).map((x, i) => ({ nombre: x.nombre, monto: x.monto, color: PALETA_CONCEPTOS[i] }));
-  const resto = orden.slice(PALETA_CONCEPTOS.length).reduce((t, x) => t + x.monto, 0);
-  if(resto > 0) items.push({ nombre: "Otros", monto: Math.round(resto * 100) / 100, color: C_GRIS });
-  return items;
+  // "Playera/Hoodie" (y variantes) se muestra como "Merch"; las categorías iguales se suman
+  const unidas = {};
+  lista.forEach(x => {
+    const t = sinAcentos(x.nombre);
+    const nombre = (t.indexOf("playera") !== -1 || t.indexOf("hoodie") !== -1 || t === "merch") ? "Merch" : x.nombre;
+    const clave = sinAcentos(nombre);
+    if(!unidas[clave]) unidas[clave] = { nombre: nombre, monto: 0 };
+    unidas[clave].monto += x.monto;
+  });
+  let extra = 0;
+  return Object.keys(unidas).map(k => unidas[k])
+    .sort((a, b) => b.monto - a.monto)
+    .map(x => ({ nombre: x.nombre, monto: Math.round(x.monto * 100) / 100,
+                 color: COLOR_CONCEPTO[sinAcentos(x.nombre)] || COLOR_CONCEPTO_EXTRA[extra++ % COLOR_CONCEPTO_EXTRA.length] }));
 }
 function tFinanzas(d){
   const tablas = d.anios.length ? d.anios.map(y => `<div class="seccion"><div class="subt">${y.anio}</div>
