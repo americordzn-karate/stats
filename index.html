@@ -83,6 +83,15 @@
   td.neg{ color:#ff4d5e; font-weight:600; }
   .hfila .anio.largo{ width:100px; }
   .hfila .val.dinero{ width:112px; }
+  .rk-grupo + .rk-grupo{ margin-top:6px; border-top:1px solid var(--borde); }
+  .rk-num{ color:var(--acento2); font-weight:700; font-size:1.4rem; text-align:center; margin:12px 0 6px; }
+  .rk-fila{ display:flex; justify-content:center; gap:12px; margin:8px 0; }
+  .rk-item{ display:flex; flex-direction:column; align-items:center; text-align:center; min-width:0; }
+  .rk-fila.c1 .rk-item{ width:50%; }
+  .rk-fila.c2 .rk-item{ width:calc(50% - 6px); }
+  .rk-fila.c4 .rk-item{ width:calc(25% - 9px); }
+  .rk-nombre{ margin-top:6px; font-weight:600; font-size:.95rem; overflow-wrap:anywhere; }
+  .rk-nombre.chico{ font-size:.8rem; font-weight:500; }
   #estado{ text-align:center; color:var(--suave); padding:40px 20px; grid-column:1 / -1; }
 </style>
 </head>
@@ -279,12 +288,42 @@ function listaConFoto(d, unidad){
   if(!d.alumnos.length) return `<div class="nota">Aún no hay registros.</div>`;
   return d.alumnos.map(a => persona(a, `<b class="acento">${d.total}</b> ${unidad}`, true)).join("") + empate(d.alumnos.length);
 }
+// Nombre sin apellidos: se ignoran las últimas dos palabras (4 palabras -> 2 nombres; 3 -> 1)
+function nombreCorto(nombre){
+  const p = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  if(p.length <= 2) return p[0] || "";
+  return p.slice(0, p.length - 2).join(" ");
+}
+function rkItem(a, chica){
+  return `<div class="rk-item"><div class="foto${chica ? " mini" : ""}" data-foto="${esc(a.id)}">${esc(iniciales(a.nombre))}</div>
+          <div class="rk-nombre${chica ? " chico" : ""}">${esc(nombreCorto(a.nombre))}</div></div>`;
+}
+function rkFila(items, clase, chica){
+  return `<div class="rk-fila ${clase}">${items.map(a => rkItem(a, chica)).join("")}</div>`;
+}
 function tDestacados(d){
   const r = d.ranking || [];
   if(!r.length) return `<div class="nota">Aún no hay registros.</div>`;
-  const unidad = n => n === 1 ? "examen destacado" : "exámenes destacados";
-  // Los de primer lugar (incluye empates) con foto grande; los demás con foto pequeña
-  return r.map(a => persona(a, `<b class="acento">${a.total}</b> ${unidad(a.total)}`, true, a.total !== d.total)).join("");
+
+  // Grupos por número de exámenes destacados, de mayor a menor (dentro de cada grupo, orden alfabético)
+  const grupos = [];
+  r.forEach(a => {
+    let g = grupos[grupos.length - 1];
+    if(!g || g.total !== a.total){ g = { total: a.total, alumnos: [] }; grupos.push(g); }
+    g.alumnos.push(a);
+  });
+
+  return grupos.map((g, i) => {
+    let filas = "";
+    if(i === 0){                                   // primer lugar: 2 columnas, fotos grandes
+      let lista = g.alumnos.slice();
+      if(lista.length % 2 === 1) filas += rkFila([lista.shift()], "c1", false);   // si son impares, el primero va solo y centrado
+      for(let k = 0; k < lista.length; k += 2) filas += rkFila(lista.slice(k, k + 2), "c2", false);
+    } else {                                       // demás lugares: 4 columnas, fotos chicas
+      for(let k = 0; k < g.alumnos.length; k += 4) filas += rkFila(g.alumnos.slice(k, k + 4), "c4", true);
+    }
+    return `<div class="rk-grupo"><div class="rk-num">${g.total}</div>${filas}</div>`;
+  }).join("");
 }
 function tPerfectas(d){  return listaConFoto(d, d.total === 1 ? "asistencia perfecta" : "asistencias perfectas"); }
 
