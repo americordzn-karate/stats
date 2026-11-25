@@ -92,10 +92,26 @@
   .rk-fila.c4 .rk-item{ width:calc(25% - 9px); }
   .rk-nombre{ margin-top:6px; font-weight:600; font-size:.95rem; overflow-wrap:anywhere; }
   .rk-nombre.chico{ font-size:.8rem; font-weight:500; }
+  .dona .centro.sm{ font-size:13px; }
+  #carga{ position:fixed; inset:0; z-index:50; background:rgba(13,13,15,.94); display:flex; align-items:center; justify-content:center; }
+  #carga.oculto{ display:none; }
+  .carga-caja{ width:min(340px, 86vw); text-align:center; }
+  .carga-titulo{ color:var(--suave); font-size:.85rem; letter-spacing:.12em; text-transform:uppercase; }
+  .carga-pista{ height:12px; background:#222229; border-radius:6px; overflow:hidden; margin:14px 0 8px; }
+  #cargaBarra{ height:100%; width:0; background:#f5c518; border-radius:6px; transition:width .25s ease; }
+  #cargaPct{ font-weight:700; font-size:1.1rem; }
   #estado{ text-align:center; color:var(--suave); padding:40px 20px; grid-column:1 / -1; }
 </style>
 </head>
 <body>
+
+<div id="carga" class="oculto" role="status" aria-live="polite">
+  <div class="carga-caja">
+    <div class="carga-titulo">Cargando estadísticas…</div>
+    <div class="carga-pista"><div id="cargaBarra"></div></div>
+    <div id="cargaPct">0%</div>
+  </div>
+</div>
 
 <header id="encabezado" class="oculto">
   <div>
@@ -209,10 +225,25 @@ function tExamenes(d){
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
 }
-const COLOR_METODO = { "Transferencia":"#3b82f6", "Efectivo":"#f5c518", "Tarjeta":"#d4152f", "Otro":"#6b6b78" };
+// Paleta de colores de la tarjeta FINANZAS
+const C_ROJO = "#d4152f", C_AMARILLO = "#f5c518", C_VERDE = "#2fb457", C_AZUL = "#2f6fed",
+      C_CELESTE = "#5cd0f5", C_MORADO = "#a855f7", C_GRIS = "#6b6b78";
+const COLOR_METODO = { "Transferencia":C_AZUL, "Efectivo":C_VERDE, "Tarjeta":C_ROJO, "Portal":C_CELESTE, "Otro":C_GRIS };
+const COLOR_GASTO  = { "Comisiones Portal":C_CELESTE, "Inventario":C_AMARILLO, "Publicidad":C_ROJO, "Senpai":C_MORADO, "Otros":C_GRIS };
+const PALETA_CONCEPTOS = [C_ROJO, C_AMARILLO, C_VERDE, C_AZUL, C_CELESTE, C_MORADO];
+const dineroCorto = n => "$" + Number(n).toLocaleString("es-MX", { maximumFractionDigits: 0 });
+
+// Gráfica circular por monto: items = [{nombre, monto, color}]
+function donaMonto(items, etiqueta){
+  const total = items.reduce((t, x) => t + x.monto, 0);
+  if(!items.length) return `<div class="nota">Sin registros.</div>`;
+  const partes = items.map(x => ({ valor: x.monto, color: x.color,
+    texto: `${x.nombre}: ${(x.monto / total * 100).toFixed(1)}% · ${dinero(x.monto)}` }));
+  return donaGen(partes, total, etiqueta, dineroCorto(total));
+}
 
 // Gráfica circular genérica: partes = [{valor, color, texto}]
-function donaGen(partes, total, etiqueta){
+function donaGen(partes, total, etiqueta, centro){
   const R = 46, C = 2 * Math.PI * R;
   let acumulado = 0;
   const arcos = total > 0 ? partes.filter(p => p.valor > 0).map(p => {
@@ -226,12 +257,20 @@ function donaGen(partes, total, etiqueta){
   return `<div class="dona-caja">
     <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="${esc(etiqueta)}">
       ${arcos}
-      <text class="centro" x="60" y="62">${total}</text>
+      <text class="centro${centro !== undefined ? " sm" : ""}" x="60" y="62">${centro !== undefined ? esc(centro) : total}</text>
       <text class="centro2" x="60" y="75">${esc(etiqueta)}</text>
     </svg>
     <div class="leyenda">${leyenda}</div></div>`;
 }
 
+// Hasta 6 categorías con color propio (de mayor a menor monto); el resto se agrupa en "Otros" (gris)
+function itemsConceptos(lista){
+  const orden = lista.slice().sort((a, b) => b.monto - a.monto);
+  const items = orden.slice(0, PALETA_CONCEPTOS.length).map((x, i) => ({ nombre: x.nombre, monto: x.monto, color: PALETA_CONCEPTOS[i] }));
+  const resto = orden.slice(PALETA_CONCEPTOS.length).reduce((t, x) => t + x.monto, 0);
+  if(resto > 0) items.push({ nombre: "Otros", monto: Math.round(resto * 100) / 100, color: C_GRIS });
+  return items;
+}
 function tFinanzas(d){
   const tablas = d.anios.length ? d.anios.map(y => `<div class="seccion"><div class="subt">${y.anio}</div>
       <div class="tabla-scroll"><table>
@@ -255,6 +294,8 @@ function tFinanzas(d){
   return tablas
     + `<div class="seccion"><div class="subt">Operaciones por método de pago</div>${circular}</div>
        <div class="seccion"><div class="subt">Dinero recibido por método de pago</div>${barras || `<div class="nota">Sin registros.</div>`}</div>
+       <div class="seccion"><div class="subt">Pagos recibidos por categoría</div>${donaMonto(itemsConceptos(d.conceptos || []), "recibido")}</div>
+       <div class="seccion"><div class="subt">Gastos por categoría</div>${donaMonto((d.gastosCat || []).map(g => ({ nombre: g.nombre, monto: g.monto, color: COLOR_GASTO[g.nombre] || C_GRIS })), "gastado")}</div>
        <div class="nota">% = (ingreso − gasto) ÷ ingreso. Verde: el ingreso supera al gasto; rojo: el gasto supera al ingreso. No se consideran pagos de $0 ni cancelados.${d.aviso ? " Aviso: " + esc(d.aviso) : ""}</div>`;
 }
 function tHorario(d){
@@ -396,6 +437,31 @@ async function bioEntrar(){
   cargar(b.token, true);
 }
 
+/* ---------- barra de carga ----------
+   El servidor responde de una sola vez, así que el avance mientras espera es
+   estimado (sube hasta 90 %); al recibir los datos pasa a 95 % y al dibujar a 100 %. */
+let cargaTimer = null, cargaPct = 0;
+function cargaPonerPct(p){
+  cargaPct = Math.max(0, Math.min(100, p));
+  $("cargaBarra").style.width = cargaPct + "%";
+  $("cargaPct").textContent = Math.round(cargaPct) + "%";
+}
+function cargaIniciar(){
+  clearInterval(cargaTimer);
+  cargaPonerPct(0);
+  $("carga").classList.remove("oculto");
+  cargaTimer = setInterval(() => { if(cargaPct < 90) cargaPonerPct(Math.min(90, cargaPct + (90 - cargaPct) * 0.06 + 0.3)); }, 150);
+}
+function cargaDetener(){
+  clearInterval(cargaTimer);
+  $("carga").classList.add("oculto");
+}
+async function cargaCompletar(){
+  clearInterval(cargaTimer);
+  cargaPonerPct(100);
+  await new Promise(r => setTimeout(r, 400));     // se alcanza a ver el 100 %
+}
+
 /* ---------- comunicación con el servidor ---------- */
 async function pedir(token){
   const r = await fetch(API_URL, {
@@ -444,6 +510,7 @@ function pintar(resp){
 async function cargar(token, desdeLogin){
   $("btnEntrar").disabled = true; $("btnActualizar").disabled = true;
   $("msgAcceso").textContent = "";
+  cargaIniciar();
   if(!desdeLogin){ $("contenido").innerHTML = `<div id="estado">Calculando estadísticas…</div>`; }
   try{
     if(API_URL.indexOf("PEGUE_AQUI") === 0) throw new Error("Falta configurar API_URL en la página.");
@@ -465,11 +532,14 @@ async function cargar(token, desdeLogin){
     $("acceso").classList.add("oculto");
     $("encabezado").classList.remove("oculto");
     $("contenido").classList.remove("oculto");
+    cargaPonerPct(95);
     pintar(resp);
+    await cargaCompletar();
   }catch(e){
     if(desdeLogin) mostrarLogin("No se pudo conectar: " + e.message);
     else $("contenido").innerHTML = `<div id="estado" class="error">No se pudo conectar: ${esc(e.message)}</div>`;
   }finally{
+    cargaDetener();
     $("btnEntrar").disabled = false; $("btnActualizar").disabled = false;
   }
 }
