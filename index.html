@@ -74,6 +74,15 @@
   .hfila .pista{ flex:1; height:20px; background:#1e1e24; border-radius:4px; overflow:hidden; }
   .hfila .relleno{ height:100%; border-radius:4px; min-width:2px; }
   .hfila .val{ width:48px; text-align:right; font-size:.85rem; }
+  .grafica.compacta{ gap:4px; overflow-x:visible; }
+  .grafica.compacta .col{ min-width:0; }
+  .grafica.compacta .bar{ max-width:26px; }
+  .grafica.compacta .val{ font-size:.72rem; }
+  th.num, td.num{ text-align:right; white-space:nowrap; }
+  td.pos{ color:#3ecf6e; font-weight:600; }
+  td.neg{ color:#ff4d5e; font-weight:600; }
+  .hfila .anio.largo{ width:100px; }
+  .hfila .val.dinero{ width:112px; }
   #estado{ text-align:center; color:var(--suave); padding:40px 20px; grid-column:1 / -1; }
 </style>
 </head>
@@ -116,12 +125,13 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwX5w8iiwkJVbGtpz-5f20U
 const TARJETAS = [
   { clave:"ingresosPortal",       titulo:"Alumno con más ingresos al portal de retos", dibujar:tIngresos },
   { clave:"horarioPortal",        titulo:"Horario con más ingresos al portal",         dibujar:tHorario },
-  { clave:"diaPortal",            titulo:"INGRESOS POR DÍA",          dibujar:tDia },
+  { clave:"diaPortal",            titulo:"INGRESOS AL PORTAL POR DÍA",          dibujar:tDia },
   { clave:"asistencias",          titulo:"Alumno con más asistencias",                 dibujar:tAsistencias },
   { clave:"destacados",           titulo:"Más exámenes destacados",                    dibujar:tDestacados },
   { clave:"asistenciasPerfectas", titulo:"Más asistencias perfectas",                  dibujar:tPerfectas },
   { clave:"examenes",            titulo:"Exámenes aplicados y evaluaciones",           dibujar:tExamenes, ancha:true },
-  { clave:"pagos",                titulo:"Pagos por año (por alumno)",                 dibujar:tPagos, ancha:true }
+  { clave:"pagos",                titulo:"Pagos por año (por alumno)",                 dibujar:tPagos, ancha:true },
+  { clave:"finanzas",            titulo:"FINANZAS",                                   dibujar:tFinanzas, ancha:true }
 ];
 
 /* ---------- utilidades ---------- */
@@ -190,6 +200,54 @@ function tExamenes(d){
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
 }
+const COLOR_METODO = { "Transferencia":"#3b82f6", "Efectivo":"#f5c518", "Tarjeta":"#d4152f", "Otro":"#6b6b78" };
+
+// Gráfica circular genérica: partes = [{valor, color, texto}]
+function donaGen(partes, total, etiqueta){
+  const R = 46, C = 2 * Math.PI * R;
+  let acumulado = 0;
+  const arcos = total > 0 ? partes.filter(p => p.valor > 0).map(p => {
+    const largo = C * p.valor / total;
+    const el = `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${p.color}" stroke-width="16"
+      stroke-dasharray="${largo} ${C - largo}" stroke-dashoffset="${-acumulado}" transform="rotate(-90 60 60)"/>`;
+    acumulado += largo;
+    return el;
+  }).join("") : `<circle cx="60" cy="60" r="${R}" fill="none" stroke="#3a3a44" stroke-width="16"/>`;
+  const leyenda = partes.map(p => `<div><i style="background:${p.color}"></i>${esc(p.texto)}</div>`).join("");
+  return `<div class="dona-caja">
+    <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="${esc(etiqueta)}">
+      ${arcos}
+      <text class="centro" x="60" y="62">${total}</text>
+      <text class="centro2" x="60" y="75">${esc(etiqueta)}</text>
+    </svg>
+    <div class="leyenda">${leyenda}</div></div>`;
+}
+
+function tFinanzas(d){
+  const tablas = d.anios.length ? d.anios.map(y => `<div class="seccion"><div class="subt">${y.anio}</div>
+      <div class="tabla-scroll"><table>
+        <thead><tr><th>Mes</th><th class="num">Ingreso</th><th class="num">Gasto</th><th class="num">%</th></tr></thead>
+        <tbody>${y.meses.map(m => `<tr><td>${m.mes}</td><td class="num">${dinero(m.ingreso)}</td>
+          <td class="num">${dinero(m.gasto)}</td>
+          <td class="num ${m.pct > 0 ? "pos" : m.pct < 0 ? "neg" : ""}">${m.pct > 0 ? "+" : ""}${m.pct}%</td></tr>`).join("")}</tbody>
+      </table></div></div>`).join("")
+    : `<div class="nota">Sin registros.</div>`;
+
+  const ms = d.metodos.filter(m => m.operaciones > 0);
+  const circular = donaGen(
+    d.metodos.map(m => ({ valor: m.operaciones, color: COLOR_METODO[m.nombre] || "#6b6b78",
+                          texto: `${m.nombre}: ${m.pct}% (${veces(m.operaciones, "operación", "operaciones")})` })),
+    d.operaciones, "operaciones");
+  const maxM = Math.max(1, ...ms.map(m => m.monto));
+  const barras = ms.map(m => `<div class="hfila"><span class="anio largo">${esc(m.nombre)}</span>
+      <div class="pista"><div class="relleno" style="width:${(m.monto / maxM * 100).toFixed(1)}%;background:${COLOR_METODO[m.nombre] || "#6b6b78"}"></div></div>
+      <span class="val dinero">${dinero(m.monto)}</span></div>`).join("");
+
+  return tablas
+    + `<div class="seccion"><div class="subt">Operaciones por método de pago</div>${circular}</div>
+       <div class="seccion"><div class="subt">Dinero recibido por método de pago</div>${barras || `<div class="nota">Sin registros.</div>`}</div>
+       <div class="nota">% = (ingreso − gasto) ÷ ingreso. Verde: el ingreso supera al gasto; rojo: el gasto supera al ingreso. No se consideran pagos de $0 ni cancelados.${d.aviso ? " Aviso: " + esc(d.aviso) : ""}</div>`;
+}
 function tHorario(d){
   if(!d.horas.length) return `<div class="nota">Sin registros.</div>`;
   return `<div class="grande">${d.horas.map(rangoHora).join("<br>")}</div>
@@ -202,7 +260,7 @@ function tDia(d){
   const barras = d.porDia.map(x => `<div class="col" title="${esc(x.dia)}"><span class="val">${x.cantidad}</span>
       <div class="bar amarillo" style="height:${Math.round(x.cantidad / maxV * 140)}px"></div>
       <span class="anio">${letras[x.dia] || ""}</span></div>`).join("");
-  return `<div class="grafica">${barras}</div>
+  return `<div class="grafica compacta">${barras}</div>
     <div class="total">Total: <b>${d.total}</b> ingresos</div>`;
 }
 function bloqueAsistencias(titulo, datos){
