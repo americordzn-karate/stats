@@ -64,6 +64,16 @@
   .total{ margin-top:14px; padding-top:12px; border-top:1px solid var(--borde); font-size:1rem; }
   .total b{ color:var(--acento2); font-size:1.3rem; }
   .btn-huella{ margin-top:10px; }
+  .foto.mini{ width:46px; height:46px; font-size:.9rem; border-width:2px; }
+  .subt{ color:var(--suave); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; margin:2px 0 4px; }
+  .subt + .persona, .subt + .barra{ margin-top:0; }
+  .seccion + .seccion{ margin-top:16px; padding-top:14px; border-top:1px solid var(--borde); }
+  .col .bar.amarillo, .relleno{ background:#f5c518; }
+  .hfila{ display:flex; align-items:center; gap:10px; margin:7px 0; }
+  .hfila .anio{ width:46px; font-size:.82rem; color:var(--suave); }
+  .hfila .pista{ flex:1; height:20px; background:#1e1e24; border-radius:4px; overflow:hidden; }
+  .hfila .relleno{ height:100%; border-radius:4px; min-width:2px; }
+  .hfila .val{ width:48px; text-align:right; font-size:.85rem; }
   #estado{ text-align:center; color:var(--suave); padding:40px 20px; grid-column:1 / -1; }
 </style>
 </head>
@@ -106,7 +116,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbwX5w8iiwkJVbGtpz-5f20U
 const TARJETAS = [
   { clave:"ingresosPortal",       titulo:"Alumno con más ingresos al portal de retos", dibujar:tIngresos },
   { clave:"horarioPortal",        titulo:"Horario con más ingresos al portal",         dibujar:tHorario },
-  { clave:"diaPortal",            titulo:"Día de la semana con más ingresos",          dibujar:tDia },
+  { clave:"diaPortal",            titulo:"INGRESOS POR DÍA",          dibujar:tDia },
   { clave:"asistencias",          titulo:"Alumno con más asistencias",                 dibujar:tAsistencias },
   { clave:"destacados",           titulo:"Más exámenes destacados",                    dibujar:tDestacados },
   { clave:"asistenciasPerfectas", titulo:"Más asistencias perfectas",                  dibujar:tPerfectas },
@@ -124,9 +134,9 @@ function rangoHora(h){ return hora12(h) + " – " + hora12((h + 1) % 24); }
 function iniciales(n){ return String(n).split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join("").toUpperCase(); }
 function unir(lista){ return lista.length < 2 ? (lista[0] || "") : lista.slice(0,-1).join(", ") + " y " + lista[lista.length-1]; }
 
-function persona(a, detalleHTML, conFoto){
+function persona(a, detalleHTML, conFoto, chica){
   const foto = conFoto
-    ? `<div class="foto" data-foto="${esc(a.id)}">${esc(iniciales(a.nombre))}</div>` : "";
+    ? `<div class="foto${chica ? " mini" : ""}" data-foto="${esc(a.id)}">${esc(iniciales(a.nombre))}</div>` : "";
   return `<div class="persona">${foto}<div><div class="nombre">${esc(a.nombre)}</div>
           <div class="dato">${detalleHTML}</div></div></div>`;
 }
@@ -169,13 +179,14 @@ function dona(g){
 }
 function tExamenes(d){
   const maxV = Math.max(1, ...d.porAnio.map(x => x.cantidad));
-  const barras = d.porAnio.map(x => `<div class="col"><span class="val">${x.cantidad}</span>
-      <div class="bar" style="height:${Math.round(x.cantidad / maxV * 140)}px"></div><span class="anio">${x.anio}</span></div>`).join("");
+  const filas = d.porAnio.map(x => `<div class="hfila"><span class="anio">${x.anio}</span>
+      <div class="pista"><div class="relleno" style="width:${(x.cantidad / maxV * 100).toFixed(1)}%"></div></div>
+      <span class="val">${x.cantidad}</span></div>`).join("");
   return `<div class="barra">
       <div><b>${d.aplicados}</b>exámenes aplicados</div>
       <div><b>${d.evaluaciones}</b>registros de evaluación de alumnos</div></div>
-    <div class="nota" style="margin-top:16px">Evaluaciones de alumnos por año</div>
-    ${d.porAnio.length ? `<div class="grafica">${barras}</div>` : `<div class="nota">Sin registros.</div>`}
+    <div class="nota" style="margin:16px 0 8px">Evaluaciones de alumnos por año</div>
+    ${d.porAnio.length ? filas : `<div class="nota">Sin registros.</div>`}
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
 }
@@ -185,13 +196,26 @@ function tHorario(d){
           <div class="nota">${veces(d.ingresos, "ingreso", "ingresos")} ${d.horas.length > 1 ? "en cada uno de estos periodos" : "en ese periodo"}.</div>`;
 }
 function tDia(d){
-  if(!d.dias.length) return `<div class="nota">Sin registros.</div>`;
-  return `<div class="grande">${esc(unir(d.dias))}</div>
-          <div class="nota">${veces(d.ingresos, "ingreso", "ingresos")} ${d.dias.length > 1 ? "en cada uno" : "en total"}.</div>`;
+  if(!d.porDia || !d.total) return `<div class="nota">Sin registros.</div>`;
+  const letras = { "Domingo":"D", "Lunes":"L", "Martes":"M", "Miércoles":"M", "Jueves":"J", "Viernes":"V", "Sábado":"S" };
+  const maxV = Math.max(1, ...d.porDia.map(x => x.cantidad));
+  const barras = d.porDia.map(x => `<div class="col" title="${esc(x.dia)}"><span class="val">${x.cantidad}</span>
+      <div class="bar amarillo" style="height:${Math.round(x.cantidad / maxV * 140)}px"></div>
+      <span class="anio">${letras[x.dia] || ""}</span></div>`).join("");
+  return `<div class="grafica">${barras}</div>
+    <div class="total">Total: <b>${d.total}</b> ingresos</div>`;
+}
+function bloqueAsistencias(titulo, datos){
+  const lista = datos.alumnos || [];
+  const chica = lista.length > 1;                       // con empate, fotos más pequeñas
+  const cuerpo = lista.length
+    ? lista.map(a => persona(a, `<b class="acento">${datos.asistencias}</b> asistencias`, true, chica)).join("") + empate(lista.length)
+    : `<div class="nota">Sin asistencias registradas.</div>`;
+  return `<div class="seccion"><div class="subt">${esc(titulo)}</div>${cuerpo}</div>`;
 }
 function tAsistencias(d){
-  if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
-  return d.alumnos.map(a => persona(a, `<b class="acento">${d.asistencias}</b> asistencias`, true)).join("") + empate(d.alumnos.length);
+  return bloqueAsistencias("En total", d)
+       + (d.mes ? bloqueAsistencias("En el mes actual · " + d.mes.nombre, d.mes) : "");
 }
 function listaConFoto(d, unidad){
   if(!d.alumnos.length) return `<div class="nota">Aún no hay registros.</div>`;
@@ -291,7 +315,7 @@ async function cargarFotos(){
       }
       if(cache[id].success && cache[id].foto){
         const img = document.createElement("img");
-        img.className = "foto"; img.alt = "";
+        img.className = caja.className; img.alt = "";
         img.referrerPolicy = "no-referrer";
         img.src = cache[id].foto;
         img.onerror = () => img.replaceWith(caja);       // si no carga, se queda con las iniciales
