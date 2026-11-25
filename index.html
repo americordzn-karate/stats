@@ -127,7 +127,7 @@ const TARJETAS = [
   { clave:"horarioPortal",        titulo:"Horario con más ingresos al portal",         dibujar:tHorario },
   { clave:"diaPortal",            titulo:"INGRESOS AL PORTAL POR DÍA",          dibujar:tDia },
   { clave:"asistencias",          titulo:"Alumno con más asistencias",                 dibujar:tAsistencias },
-  { clave:"destacados",           titulo:"Más exámenes destacados",                    dibujar:tDestacados },
+  { clave:"destacados",           titulo:"Exámenes destacados",                    dibujar:tDestacados },
   { clave:"asistenciasPerfectas", titulo:"Más asistencias perfectas",                  dibujar:tPerfectas },
   { clave:"examenes",            titulo:"Exámenes aplicados y evaluaciones",           dibujar:tExamenes, ancha:true },
   { clave:"pagos",                titulo:"Pagos por año (por alumno)",                 dibujar:tPagos, ancha:true },
@@ -279,7 +279,13 @@ function listaConFoto(d, unidad){
   if(!d.alumnos.length) return `<div class="nota">Aún no hay registros.</div>`;
   return d.alumnos.map(a => persona(a, `<b class="acento">${d.total}</b> ${unidad}`, true)).join("") + empate(d.alumnos.length);
 }
-function tDestacados(d){ return listaConFoto(d, d.total === 1 ? "examen destacado" : "exámenes destacados"); }
+function tDestacados(d){
+  const r = d.ranking || [];
+  if(!r.length) return `<div class="nota">Aún no hay registros.</div>`;
+  const unidad = n => n === 1 ? "examen destacado" : "exámenes destacados";
+  // Los de primer lugar (incluye empates) con foto grande; los demás con foto pequeña
+  return r.map(a => persona(a, `<b class="acento">${a.total}</b> ${unidad(a.total)}`, true, a.total !== d.total)).join("");
+}
 function tPerfectas(d){  return listaConFoto(d, d.total === 1 ? "asistencia perfecta" : "asistencias perfectas"); }
 
 function tPagos(d){
@@ -362,25 +368,26 @@ async function pedir(token){
 }
 
 async function cargarFotos(){
-  const cajas = document.querySelectorAll("[data-foto]");
+  const cajas = Array.from(document.querySelectorAll("[data-foto]"));
   const cache = {};
-  for(const caja of cajas){
-    const id = caja.dataset.foto;
-    try{
-      if(!(id in cache)){
-        const r = await fetch(API_URL + "?accion=fotoAlumno&id=" + encodeURIComponent(id));
-        cache[id] = await r.json();
-      }
-      if(cache[id].success && cache[id].foto){
+  const pedirFoto = id => cache[id] || (cache[id] = fetch(API_URL + "?accion=fotoAlumno&id=" + encodeURIComponent(id))
+                                          .then(r => r.json()).catch(() => ({ success:false })));
+  let siguiente = 0;
+  async function trabajador(){                 // 4 fotos a la vez
+    while(siguiente < cajas.length){
+      const caja = cajas[siguiente++];
+      const r = await pedirFoto(caja.dataset.foto);
+      if(r && r.success && r.foto){
         const img = document.createElement("img");
         img.className = caja.className; img.alt = "";
         img.referrerPolicy = "no-referrer";
-        img.src = cache[id].foto;
+        img.src = r.foto;
         img.onerror = () => img.replaceWith(caja);       // si no carga, se queda con las iniciales
         caja.replaceWith(img);
       }
-    }catch(e){ /* se conservan las iniciales */ }
+    }
   }
+  await Promise.all([trabajador(), trabajador(), trabajador(), trabajador()]);
 }
 
 function pintar(resp){
