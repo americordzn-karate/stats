@@ -182,17 +182,18 @@ function tIngresos(d){
   if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
   const g = d.global;
   return d.alumnos.map(a => persona(a, `<b class="acento">${a.ingresos}</b> ingresos al portal`, true)
-    + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div></div>`).join("")
+    + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div><div><b>${a.pctHuella || 0}%</b>Huella</div></div>`).join("")
     + empate(d.alumnos.length)
     + `<div class="nota">Los porcentajes de arriba son del alumno; la gráfica muestra los ingresos de todos los alumnos.</div>`
     + dona(g);
 }
 function dona(g){
   const R = 46, C = 2 * Math.PI * R;
-  const otros = Math.max(0, Math.round((100 - g.pctQR - g.pctCURP) * 10) / 10);
+  const otros = Math.max(0, Math.round((100 - g.pctQR - g.pctCURP - (g.pctHuella || 0)) * 10) / 10);
   const partes = [
     { pct:g.pctQR,   color:"#d4152f", texto:"Por QR" },
-    { pct:g.pctCURP, color:"#f5c518", texto:"Por CURP" }
+    { pct:g.pctCURP, color:"#f5c518", texto:"Por CURP" },
+    { pct:g.pctHuella || 0, color:"#2fb457", texto:"Huella" }
   ];
   if(otros >= 0.1) partes.push({ pct:otros, color:"#3a3a44", texto:"Sin método registrado" });
   let acumulado = 0;
@@ -205,7 +206,7 @@ function dona(g){
   }).join("") : `<circle cx="60" cy="60" r="${R}" fill="none" stroke="#3a3a44" stroke-width="16"/>`;
   const leyenda = partes.map(p => `<div><i style="background:${p.color}"></i>${p.texto}: <b>${p.pct}%</b></div>`).join("");
   return `<div class="dona-caja">
-    <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="Ingresos por QR y CURP">
+    <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="Ingresos por QR, CURP y Huella">
       ${arcos}
       <text class="centro" x="60" y="62">${g.total}</text>
       <text class="centro2" x="60" y="75">ingresos</text>
