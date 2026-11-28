@@ -69,6 +69,14 @@
   .subt + .persona, .subt + .barra{ margin-top:0; }
   .seccion + .seccion{ margin-top:16px; padding-top:14px; border-top:1px solid var(--borde); }
   .col .bar.amarillo, .relleno{ background:#f5c518; }
+  .pchip{ background:#1e1e24; color:var(--suave); border:1px solid var(--borde); border-radius:16px; padding:5px 12px; font-size:.78rem; cursor:pointer; font-family:inherit; }
+  .pchip.activa{ background:#f5c518; color:#111; border-color:#f5c518; font-weight:600; }
+  .buscador{ position:relative; margin-bottom:10px; }
+  .buscador input{ width:100%; padding:11px 12px; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; color:var(--texto); font-size:.95rem; font-family:inherit; }
+  .sugerencias{ margin-top:4px; border:1px solid var(--borde); border-radius:8px; overflow:hidden; }
+  .sugerencias div{ padding:9px 12px; font-size:.9rem; cursor:pointer; background:#1a1a20; border-bottom:1px solid var(--borde); }
+  .sugerencias div:last-child{ border-bottom:0; }
+  .sugerencias div:hover{ background:#26262e; }
   .pestanas{ display:flex; gap:8px; margin-bottom:14px; }
   .pestana{ background:#1e1e24; color:var(--suave); border:1px solid var(--borde); border-radius:8px; padding:7px 14px; font-size:.85rem; cursor:pointer; font-family:inherit; }
   .pestana.activa{ background:#f5c518; color:#111; border-color:#f5c518; font-weight:600; }
@@ -229,12 +237,57 @@ function tExamenes(d){
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
 }
+let AL_DATOS = null, AL_SEL = null, AL_PER = "actual";
+const alNorm = t => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function alBuscar(){
+  const q = alNorm($("busAlumno").value).trim();
+  const caja = $("busSug");
+  if(!q){ caja.innerHTML = ""; return; }
+  const palabras = q.split(/\s+/);
+  const res = AL_DATOS.alumnos.filter(a => { const n = alNorm(a.nombre); return palabras.every(p => n.indexOf(p) !== -1); }).slice(0, 8);
+  caja.innerHTML = res.length
+    ? `<div class="sugerencias">${res.map(a => `<div data-id="${esc(a.id)}" onclick="alElegir(this.dataset.id)">${esc(a.nombre)}</div>`).join("")}</div>`
+    : `<div class="nota">Sin coincidencias.</div>`;
+}
+function alElegir(id){
+  AL_SEL = AL_DATOS.alumnos.filter(a => a.id === id)[0] || null;
+  $("busSug").innerHTML = "";
+  if(AL_SEL) $("busAlumno").value = AL_SEL.nombre;
+  alMostrar();
+}
+function alPeriodo(p){ AL_PER = p; alMostrar(); }
+function alMostrar(){
+  const cont = $("alResultado");
+  const a = AL_SEL;
+  if(!a){ cont.innerHTML = ""; return; }
+  const cab = `<div style="margin:14px 0 4px"><b>${esc(a.nombre)}</b>${a.horario ? ` <span class="nota">· grupo ${esc(a.horario)}</span>` : ""}</div>`;
+  if(a.sinGrupo){ cont.innerHTML = cab + `<div class="nota">Este alumno no tiene grupo asignado.</div>`; return; }
+  if(a.sinHorario){ cont.innerHTML = cab + `<div class="nota">Sin horario configurado para su grupo.</div>`; return; }
+  const chips = AL_DATOS.periodos.map(p => `<button type="button" class="pchip${p.clave === AL_PER ? " activa" : ""}" onclick="alPeriodo('${p.clave}')">${esc(p.nombre)}</button>`).join(" ");
+  const d = a.periodos[AL_PER];
+  let cuerpo;
+  if(!d || d.clases === 0){
+    cuerpo = `<div class="nota" style="margin-top:12px">Su grupo no tuvo clases en este periodo.</div>`;
+  } else {
+    const partes = [
+      { valor:d.propio, color:C_VERDE,    texto:`Asistió a su horario: ${d.propio}` },
+      { valor:d.otro,   color:C_AMARILLO, texto:`Asistió en otro horario: ${d.otro}` },
+      { valor:d.falta,  color:C_ROJO,     texto:`Faltó: ${d.falta}` }
+    ];
+    cuerpo = donaGen(partes, d.clases, "índice", d.indice.toFixed(1) + "%");
+  }
+  const extra = d && d.adicionales ? `<div class="nota">Además registró ${d.adicionales} asistencia${d.adicionales === 1 ? "" : "s"} en días sin clase de su grupo (no entran al índice).</div>` : "";
+  cont.innerHTML = cab + `<div style="margin:8px 0">${chips}</div>` + cuerpo + extra
+    + `<div class="nota">Índice = (asistió a su horario + asistió en otro horario) ÷ clases de su grupo en el periodo. Cada clase de su grupo en la que no asistió ese día cuenta como falta.</div>`;
+}
 function grupoPestana(btn, n){
   const caja = btn.closest(".tarjeta");
   caja.querySelectorAll(".pestana").forEach((b, k) => b.classList.toggle("activa", k === n));
   caja.querySelectorAll(".panel-pestana").forEach((p, k) => p.style.display = k === n ? "" : "none");
 }
-function tGrupos(d){
+function tGrupos(d, mods, errs){
+  mods = mods || {}; errs = errs || {};
+  AL_DATOS = mods.indiceAlumnos || null; AL_SEL = null; AL_PER = "actual";
   const bloque = (m, k) => {
     const filas = m.grupos.map(g => `<div style="margin:10px 0">
         <div class="hfila" style="margin:0 0 3px"><span class="anio largo">${esc(g.horario)}${g.ganador ? " ★" : ""}</span>
@@ -245,8 +298,13 @@ function tGrupos(d){
       <div class="subt">${esc(m.nombre)}</div>
       ${m.grupos.length ? filas : `<div class="nota">Sin asistencias en horario de clase este mes.</div>`}</div>`;
   };
-  const botones = d.meses.map((m, k) => `<button type="button" class="pestana${k ? "" : " activa"}" onclick="grupoPestana(this,${k})">${esc(m.etiqueta)}</button>`).join("");
-  return `<div class="pestanas">${botones}</div>` + d.meses.map(bloque).join("") +
+  const nMes = d.meses.length;
+  const botones = d.meses.map((m, k) => `<button type="button" class="pestana${k ? "" : " activa"}" onclick="grupoPestana(this,${k})">${esc(m.etiqueta)}</button>`).join("")
+    + `<button type="button" class="pestana" onclick="grupoPestana(this,${nMes})">Por alumno</button>`;
+  const panelAlumno = AL_DATOS
+    ? `<div class="panel-pestana" style="display:none"><div class="buscador"><input type="text" id="busAlumno" placeholder="Escriba el nombre del alumno…" autocomplete="off" oninput="alBuscar()"></div><div id="busSug"></div><div id="alResultado"></div></div>`
+    : `<div class="panel-pestana" style="display:none"><div class="error">No se pudo calcular: ${esc(errs.indiceAlumnos || "sin datos")}</div></div>`;
+  return `<div class="pestanas">${botones}</div>` + d.meses.map(bloque).join("") + panelAlumno +
     `<div class="nota">Índice = asistencias de los alumnos del grupo ÷ (alumnos activos del grupo × clases impartidas). ★ = mayor índice. Cada asistencia se asigna al grupo según el dojo, día y hora en que se registró; las de alumnos de otros grupos se indican como visitantes y no entran al índice. Las asistencias fuera de horario (clases especiales) no cuentan.</div>`;
 }
 // Paleta de colores de la tarjeta FINANZAS
@@ -542,7 +600,7 @@ function pintar(resp){
     let cuerpo;
     if(resp.errores && resp.errores[t.clave]) cuerpo = `<div class="error">No se pudo calcular: ${esc(resp.errores[t.clave])}</div>`;
     else if(!resp.modulos[t.clave]) cuerpo = `<div class="nota">Sin datos.</div>`;
-    else cuerpo = t.dibujar(resp.modulos[t.clave]);
+    else cuerpo = t.dibujar(resp.modulos[t.clave], resp.modulos, resp.errores || {});
     return `<section class="tarjeta${t.ancha ? " ancha" : ""}"><h3>${esc(t.titulo)}</h3>${cuerpo}</section>`;
   }).join("");
   cargarFotos();
