@@ -69,6 +69,9 @@
   .subt + .persona, .subt + .barra{ margin-top:0; }
   .seccion + .seccion{ margin-top:16px; padding-top:14px; border-top:1px solid var(--borde); }
   .col .bar.amarillo, .relleno{ background:#f5c518; }
+  .pestanas{ display:flex; gap:8px; margin-bottom:14px; }
+  .pestana{ background:#1e1e24; color:var(--suave); border:1px solid var(--borde); border-radius:8px; padding:7px 14px; font-size:.85rem; cursor:pointer; font-family:inherit; }
+  .pestana.activa{ background:#f5c518; color:#111; border-color:#f5c518; font-weight:600; }
   .hfila{ display:flex; align-items:center; gap:10px; margin:7px 0; }
   .hfila .anio{ width:46px; font-size:.82rem; color:var(--suave); }
   .hfila .pista{ flex:1; height:20px; background:#1e1e24; border-radius:4px; overflow:hidden; }
@@ -226,18 +229,25 @@ function tExamenes(d){
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
 }
+function grupoPestana(btn, n){
+  const caja = btn.closest(".tarjeta");
+  caja.querySelectorAll(".pestana").forEach((b, k) => b.classList.toggle("activa", k === n));
+  caja.querySelectorAll(".panel-pestana").forEach((p, k) => p.style.display = k === n ? "" : "none");
+}
 function tGrupos(d){
-  const bloque = m => {
+  const bloque = (m, k) => {
     const filas = m.grupos.map(g => `<div style="margin:10px 0">
         <div class="hfila" style="margin:0 0 3px"><span class="anio largo">${esc(g.horario)}${g.ganador ? " ★" : ""}</span>
           <div class="pista"><div class="relleno" style="width:${g.indice === null ? 0 : Math.min(100, g.indice)}%"></div></div>
           <span class="val">${g.indice === null ? "—" : g.indice.toFixed(1) + "%"}</span></div>
-        <div class="nota" style="margin:0 0 0 110px">${esc(g.nombre)} · ${g.alumnos} alumnos · ${g.clases} clases · ${g.asistencias} asistencias</div></div>`).join("");
-    return `<div class="seccion"><div class="subt">${esc(m.etiqueta)} · ${esc(m.nombre)}</div>
+        <div class="nota" style="margin:0 0 0 110px">${esc(g.nombre)} · ${g.alumnos} alumnos activos · ${g.clases} clases · ${g.asistencias} asistencias</div></div>`).join("");
+    return `<div class="panel-pestana"${k ? ` style="display:none"` : ""}>
+      <div class="subt">${esc(m.nombre)}</div>
       ${m.grupos.length ? filas : `<div class="nota">Sin grupos registrados.</div>`}</div>`;
   };
-  return d.meses.map(bloque).join("") +
-    `<div class="nota">Índice = asistencias ÷ (alumnos del grupo × clases impartidas). ★ = mayor índice. Una clase cuenta como impartida si algún alumno del grupo registró asistencia ese día.</div>`;
+  const botones = d.meses.map((m, k) => `<button type="button" class="pestana${k ? "" : " activa"}" onclick="grupoPestana(this,${k})">${esc(m.etiqueta)}</button>`).join("");
+  return `<div class="pestanas">${botones}</div>` + d.meses.map(bloque).join("") +
+    `<div class="nota">Índice = asistencias ÷ (alumnos activos del grupo × clases impartidas). ★ = mayor índice. Una clase cuenta como impartida si algún alumno activo del grupo registró asistencia ese día.</div>`;
 }
 // Paleta de colores de la tarjeta FINANZAS
 const C_ROJO = "#d4152f", C_AMARILLO = "#f5c518", C_VERDE = "#2fb457", C_AZUL = "#2f6fed",
