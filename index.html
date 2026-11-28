@@ -260,9 +260,11 @@ function alMostrar(){
   const cont = $("alResultado");
   const a = AL_SEL;
   if(!a){ cont.innerHTML = ""; return; }
-  const cab = `<div style="margin:14px 0 4px"><b>${esc(a.nombre)}</b>${a.horario ? ` <span class="nota">· grupo ${esc(a.horario)}</span>` : ""}</div>`;
+  const fmtF = f => f ? f.split("-").reverse().join("/") : "";
+  const cab = `<div style="margin:14px 0 4px"><b>${esc(a.nombre)}</b>${a.horario ? ` <span class="nota">· grupo ${esc(a.horario)}</span>` : ""}${a.primera ? ` <span class="nota">· primera asistencia: ${esc(fmtF(a.primera))}</span>` : ""}</div>`;
   if(a.sinGrupo){ cont.innerHTML = cab + `<div class="nota">Este alumno no tiene grupo asignado.</div>`; return; }
   if(a.sinHorario){ cont.innerHTML = cab + `<div class="nota">Sin horario configurado para su grupo.</div>`; return; }
+  if(a.sinAsistencias){ cont.innerHTML = cab + `<div class="nota">Este alumno aún no tiene asistencias registradas.</div>`; return; }
   const chips = AL_DATOS.periodos.map(p => `<button type="button" class="pchip${p.clave === AL_PER ? " activa" : ""}" onclick="alPeriodo('${p.clave}')">${esc(p.nombre)}</button>`).join(" ");
   const d = a.periodos[AL_PER];
   let cuerpo;
@@ -278,7 +280,7 @@ function alMostrar(){
   }
   const extra = d && d.adicionales ? `<div class="nota">Además registró ${d.adicionales} asistencia${d.adicionales === 1 ? "" : "s"} en días sin clase de su grupo (no entran al índice).</div>` : "";
   cont.innerHTML = cab + `<div style="margin:8px 0">${chips}</div>` + cuerpo + extra
-    + `<div class="nota">Índice = (asistió a su horario + asistió en otro horario) ÷ clases de su grupo en el periodo. Cada clase de su grupo en la que no asistió ese día cuenta como falta.</div>`;
+    + `<div class="nota">Índice = (asistió a su horario + asistió en otro horario) ÷ clases de su grupo en el periodo. Cada clase de su grupo en la que no asistió ese día cuenta como falta, a partir de su primera asistencia registrada.</div>`;
 }
 function grupoPestana(btn, n){
   const caja = btn.closest(".tarjeta");
