@@ -240,14 +240,14 @@ function tGrupos(d){
         <div class="hfila" style="margin:0 0 3px"><span class="anio largo">${esc(g.horario)}${g.ganador ? " ★" : ""}</span>
           <div class="pista"><div class="relleno" style="width:${g.indice === null ? 0 : Math.min(100, g.indice)}%"></div></div>
           <span class="val">${g.indice === null ? "—" : g.indice.toFixed(1) + "%"}</span></div>
-        <div class="nota" style="margin:0 0 0 110px">${esc(g.nombre)} · ${g.alumnos} alumnos activos · ${g.clases} clases · ${g.asistencias} asistencias</div></div>`).join("");
+        <div class="nota" style="margin:0 0 0 110px">${esc(g.sucursal)} · ${esc(g.nombre)} · ${g.alumnos} alumnos activos · ${g.clases} clases · ${g.asistencias} asistencias${g.visitantes ? ` · ${g.visitantes} de visitantes` : ""}</div></div>`).join("");
     return `<div class="panel-pestana"${k ? ` style="display:none"` : ""}>
       <div class="subt">${esc(m.nombre)}</div>
-      ${m.grupos.length ? filas : `<div class="nota">Sin grupos registrados.</div>`}</div>`;
+      ${m.grupos.length ? filas : `<div class="nota">Sin asistencias en horario de clase este mes.</div>`}</div>`;
   };
   const botones = d.meses.map((m, k) => `<button type="button" class="pestana${k ? "" : " activa"}" onclick="grupoPestana(this,${k})">${esc(m.etiqueta)}</button>`).join("");
   return `<div class="pestanas">${botones}</div>` + d.meses.map(bloque).join("") +
-    `<div class="nota">Índice = asistencias ÷ (alumnos activos del grupo × clases impartidas). ★ = mayor índice. Una clase cuenta como impartida si algún alumno activo del grupo registró asistencia ese día.</div>`;
+    `<div class="nota">Índice = asistencias de los alumnos del grupo ÷ (alumnos activos del grupo × clases impartidas). ★ = mayor índice. Cada asistencia se asigna al grupo según el dojo, día y hora en que se registró; las de alumnos de otros grupos se indican como visitantes y no entran al índice. Las asistencias fuera de horario (clases especiales) no cuentan.</div>`;
 }
 // Paleta de colores de la tarjeta FINANZAS
 const C_ROJO = "#d4152f", C_AMARILLO = "#f5c518", C_VERDE = "#2fb457", C_AZUL = "#2f6fed",
