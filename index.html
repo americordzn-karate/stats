@@ -156,7 +156,8 @@ const TARJETAS = [
   { clave:"asistenciasPerfectas", titulo:"Más asistencias perfectas",                  dibujar:tPerfectas },
   { clave:"examenes",            titulo:"Exámenes aplicados y evaluaciones",           dibujar:tExamenes, ancha:true },
   { clave:"pagos",                titulo:"Pagos por año (por alumno)",                 dibujar:tPagos, ancha:true },
-  { clave:"finanzas",            titulo:"FINANZAS",                                   dibujar:tFinanzas, ancha:true }
+  { clave:"finanzas",            titulo:"FINANZAS",                                   dibujar:tFinanzas, ancha:true },
+  { clave:"indiceGrupos",       titulo:"Índice de asistencia por grupo",              dibujar:tGrupos, ancha:true }
 ];
 
 /* ---------- utilidades ---------- */
@@ -182,18 +183,17 @@ function tIngresos(d){
   if(!d.alumnos.length) return `<div class="nota">Sin registros.</div>`;
   const g = d.global;
   return d.alumnos.map(a => persona(a, `<b class="acento">${a.ingresos}</b> ingresos al portal`, true)
-    + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div><div><b>${a.pctHuella || 0}%</b>Huella</div></div>`).join("")
+    + `<div class="barra"><div><b>${a.pctQR}%</b>por QR</div><div><b>${a.pctCURP}%</b>por CURP</div></div>`).join("")
     + empate(d.alumnos.length)
     + `<div class="nota">Los porcentajes de arriba son del alumno; la gráfica muestra los ingresos de todos los alumnos.</div>`
     + dona(g);
 }
 function dona(g){
   const R = 46, C = 2 * Math.PI * R;
-  const otros = Math.max(0, Math.round((100 - g.pctQR - g.pctCURP - (g.pctHuella || 0)) * 10) / 10);
+  const otros = Math.max(0, Math.round((100 - g.pctQR - g.pctCURP) * 10) / 10);
   const partes = [
     { pct:g.pctQR,   color:"#d4152f", texto:"Por QR" },
-    { pct:g.pctCURP, color:"#f5c518", texto:"Por CURP" },
-    { pct:g.pctHuella || 0, color:"#2fb457", texto:"Huella" }
+    { pct:g.pctCURP, color:"#f5c518", texto:"Por CURP" }
   ];
   if(otros >= 0.1) partes.push({ pct:otros, color:"#3a3a44", texto:"Sin método registrado" });
   let acumulado = 0;
@@ -206,7 +206,7 @@ function dona(g){
   }).join("") : `<circle cx="60" cy="60" r="${R}" fill="none" stroke="#3a3a44" stroke-width="16"/>`;
   const leyenda = partes.map(p => `<div><i style="background:${p.color}"></i>${p.texto}: <b>${p.pct}%</b></div>`).join("");
   return `<div class="dona-caja">
-    <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="Ingresos por QR, CURP y Huella">
+    <svg class="dona" viewBox="0 0 120 120" role="img" aria-label="Ingresos por QR y CURP">
       ${arcos}
       <text class="centro" x="60" y="62">${g.total}</text>
       <text class="centro2" x="60" y="75">ingresos</text>
@@ -225,6 +225,19 @@ function tExamenes(d){
     ${d.porAnio.length ? filas : `<div class="nota">Sin registros.</div>`}
     <div class="total">Total: <b>${d.evaluaciones}</b> evaluaciones${d.sinFecha ? ` <span class="nota">(${d.sinFecha} sin fecha válida, no incluidas en las barras)</span>` : ""}</div>
     <div class="nota">Exámenes aplicados: registros del catálogo con fecha de hoy o anterior; no se cuentan los programados.</div>`;
+}
+function tGrupos(d){
+  const bloque = m => {
+    const filas = m.grupos.map(g => `<div style="margin:10px 0">
+        <div class="hfila" style="margin:0 0 3px"><span class="anio largo">${esc(g.horario)}${g.ganador ? " ★" : ""}</span>
+          <div class="pista"><div class="relleno" style="width:${g.indice === null ? 0 : Math.min(100, g.indice)}%"></div></div>
+          <span class="val">${g.indice === null ? "—" : g.indice.toFixed(1) + "%"}</span></div>
+        <div class="nota" style="margin:0 0 0 110px">${esc(g.nombre)} · ${g.alumnos} alumnos · ${g.clases} clases · ${g.asistencias} asistencias</div></div>`).join("");
+    return `<div class="seccion"><div class="subt">${esc(m.etiqueta)} · ${esc(m.nombre)}</div>
+      ${m.grupos.length ? filas : `<div class="nota">Sin grupos registrados.</div>`}</div>`;
+  };
+  return d.meses.map(bloque).join("") +
+    `<div class="nota">Índice = asistencias ÷ (alumnos del grupo × clases impartidas). ★ = mayor índice. Una clase cuenta como impartida si algún alumno del grupo registró asistencia ese día.</div>`;
 }
 // Paleta de colores de la tarjeta FINANZAS
 const C_ROJO = "#d4152f", C_AMARILLO = "#f5c518", C_VERDE = "#2fb457", C_AZUL = "#2f6fed",
